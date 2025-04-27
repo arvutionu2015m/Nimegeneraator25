@@ -1,0 +1,237 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="et" data-bs-theme="auto">
+<head>
+    <meta charset="UTF-8">
+    <title>Nimegeneraator</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <!-- Bootstrap 5 -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+
+    <!-- Kohandatud stiilid -->
+    <style>
+      body {
+        transition: background-color 0.3s ease, color 0.3s ease;
+      }
+      .pulse {
+        animation: pulse-animation 0.6s;
+      }
+      @keyframes pulse-animation {
+        0% { transform: scale(1); }
+        50% { transform: scale(1.2); }
+        100% { transform: scale(1); }
+      }
+    </style>
+</head>
+<body class="bg-light">
+
+<!-- Logo vastavalt teemale -->
+<div class="text-center my-4">
+    <picture>
+        <source srcset="{% static 'images/logo_dark.png' %}" media="(prefers-color-scheme: dark)">
+        <img src="{% static 'images/logo_light.png' %}" alt="Nimegeneraatori logo" class="img-fluid" style="max-height: 80px;">
+    </picture>
+</div>
+
+<div class="container py-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+
+            <div class="card shadow-sm rounded-4">
+                <div class="card-body">
+
+                    <h1 class="card-title mb-4 text-center">🎯 Nimegeneraator</h1>
+
+                    <!-- Statistika -->
+                    {% if total_names > 0 %}
+                        <div class="alert alert-info text-center">
+                            Kokku salvestatud: <strong>{{ total_names }}</strong> nime, neist <strong>{{ favorite_count }}</strong> lemmikut ⭐
+                        </div>
+                    {% endif %}
+
+                    <!-- Märksõna vorm -->
+                    <form method="post">
+                        {% csrf_token %}
+                        <div class="mb-3">
+                            <label for="id_keyword" class="form-label">Sisesta märksõna</label>
+                            {{ form.keyword }}
+                        </div>
+                        <div class="d-grid">
+                            <button id="generateButton" type="submit" class="btn btn-primary btn-lg d-flex align-items-center justify-content-center" style="gap: 10px;">
+                                <span id="generateButtonText">Genereeri nimed</span>
+                                <div id="buttonSpinner" class="spinner-border spinner-border-sm" role="status" style="display: none;"></div>
+                            </button>
+                        </div>
+                    </form>
+
+                    <!-- Spinner kui genereeritakse -->
+                    <div id="loadingSpinner" class="text-center mt-4" style="display: none;">
+                        <div class="spinner-border text-primary" role="status" style="width: 3rem; height: 3rem;">
+                            <span class="visually-hidden">Laadin...</span>
+                        </div>
+                        <p class="mt-2">Nimesid genereeritakse...</p>
+                    </div>
+
+                    <!-- Genereeritud nimed -->
+                    {% if generated_names %}
+                        <div class="mt-5">
+                            <h4 class="text-success">🎉 Genereeritud nimed:</h4>
+                            <ul class="list-group list-group-flush">
+                                {% for line in generated_names.splitlines %}
+                                    {% if line.strip %}
+                                        <li class="list-group-item">{{ line|safe }}</li>
+                                    {% endif %}
+                                {% endfor %}
+                            </ul>
+                        </div>
+                    {% endif %}
+
+                    <!-- Soovitatud parim nimi -->
+                    {% if best_name %}
+                        <div class="alert alert-success text-center mt-5">
+                            🏆 Soovitatud parim nimi: <strong>{{ best_name.name }}</strong> 
+                            <br><small class="text-muted">(märksõna: {{ best_name.keyword }})</small>
+                        </div>
+                    {% endif %}
+
+                    <!-- Lemmikute sektsioon -->
+                    {% if favorite_names %}
+                        <div class="mt-5">
+                            <h4 class="text-warning">
+                                ⭐ Minu lemmiknimed 
+                                <span class="badge bg-warning text-dark">{{ favorite_names|length }}</span>
+                            </h4>
+
+                            <div class="text-end my-2">
+                                <a href="{% url 'download_favorites' %}" class="btn btn-success btn-sm me-2">
+                                    📥 Lae alla (.txt)
+                                </a>
+                                <a href="{% url 'download_favorites_csv' %}" class="btn btn-success btn-sm">
+                                    📥 Lae alla (.csv)
+                                </a>
+                            </div>
+
+                            <ul class="list-group list-group-flush">
+                                {% for name in favorite_names %}
+                                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                                        <div>
+                                            ⭐ "{{ name.name }}"
+                                            <small class="text-muted">(märksõna: "{{ name.keyword }}")</small>
+                                        </div>
+                                        <a href="{% url 'toggle_favorite' name.id %}" class="btn btn-sm btn-warning">
+                                            Eemalda ⭐
+                                        </a>
+                                    </li>
+                                {% endfor %}
+                            </ul>
+                        </div>
+                    {% endif %}
+
+                    <!-- Muud nimed -->
+                    {% if other_names %}
+                        <div class="mt-5">
+                            <h4 class="text-secondary">🗂️ Muud salvestatud nimed:</h4>
+                            <ul class="list-group list-group-flush">
+                                {% for name in other_names %}
+                                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                                        <div>
+                                            "{{ name.name }}"
+                                            <small class="text-muted">(märksõna: "{{ name.keyword }}")</small>
+                                        </div>
+                                        <a href="{% url 'toggle_favorite' name.id %}" class="btn btn-sm btn-outline-primary">
+                                            Lisa ⭐
+                                        </a>
+                                    </li>
+                                {% endfor %}
+                            </ul>
+                        </div>
+                    {% endif %}
+
+                    <!-- Kõigi nimede kustutamine -->
+                    <div class="mt-4 text-center">
+                        <a href="{% url 'delete_all_names' %}" class="btn btn-outline-danger btn-sm mt-2"
+                           onclick="return confirm('Kas oled kindel, et soovid kõik nimed kustutada?');">
+                            Kustuta kõik salvestatud nimed
+                        </a>
+                    </div>
+
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<!-- Django Messages Toastid -->
+{% if messages %}
+<div class="position-fixed bottom-0 end-0 p-3" style="z-index: 1055;">
+    {% for message in messages %}
+        <div class="toast align-items-center text-white bg-success border-0 mb-2" role="alert" aria-live="assertive" aria-atomic="true" data-bs-delay="3000" id="messageToast{{ forloop.counter }}">
+            <div class="d-flex">
+                <div class="toast-body">
+                    {{ message }}
+                </div>
+                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Sulge"></button>
+            </div>
+        </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+<!-- Hele / Tume teema lüliti nupp -->
+<button id="themeToggle" class="btn btn-light position-fixed bottom-0 end-0 m-4 rounded-circle shadow" style="width: 60px; height: 60px; font-size: 24px;">
+    🌙
+</button>
+
+<!-- Skriptid -->
+<script>
+    const form = document.querySelector('form');
+    const spinner = document.getElementById('loadingSpinner');
+    const generateButton = document.getElementById('generateButton');
+    const generateButtonText = document.getElementById('generateButtonText');
+    const buttonSpinner = document.getElementById('buttonSpinner');
+    const toggleButton = document.getElementById('themeToggle');
+    const currentTheme = localStorage.getItem('theme');
+
+    form.addEventListener('submit', function() {
+        spinner.style.display = 'block';
+        generateButton.disabled = true;
+        generateButtonText.textContent = 'Laadin...';
+        buttonSpinner.style.display = 'inline-block';
+    });
+
+    if (currentTheme) {
+        document.documentElement.setAttribute('data-bs-theme', currentTheme);
+        toggleButton.innerHTML = currentTheme === 'dark' ? '🌞' : '🌙';
+    }
+
+    toggleButton.addEventListener('click', function () {
+        let theme = document.documentElement.getAttribute('data-bs-theme');
+        if (theme === 'light') {
+            document.documentElement.setAttribute('data-bs-theme', 'dark');
+            localStorage.setItem('theme', 'dark');
+            toggleButton.innerHTML = '🌞';
+        } else {
+            document.documentElement.setAttribute('data-bs-theme', 'light');
+            localStorage.setItem('theme', 'light');
+            toggleButton.innerHTML = '🌙';
+        }
+        toggleButton.classList.add('pulse');
+        setTimeout(() => {
+            toggleButton.classList.remove('pulse');
+        }, 600);
+    });
+
+    // Näita Django messages Toastid
+    document.addEventListener('DOMContentLoaded', function () {
+        var toastElements = document.querySelectorAll('.toast');
+        toastElements.forEach(function (toastEl) {
+            var toast = new bootstrap.Toast(toastEl);
+            toast.show();
+        });
+    });
+</script>
+
+</body>
+</html>
