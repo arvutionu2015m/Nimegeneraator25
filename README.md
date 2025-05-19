@@ -1,9 +1,4 @@
-## 🏷️ Projekti nimi:  
-**Nimegeneraator**
-
----
-
-## 🎯 Projekti eesmärk:  
+Projekti eesmärk:  
 Luua veebipõhine rakendus, kus kasutaja saab sisestada märksõna ja seejärel:
 
 - Genereerida loomingulisi nimeideid OpenAI abil  
